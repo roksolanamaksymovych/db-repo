@@ -1,0 +1,44 @@
+# Systemd service файл для Flask додатку
+# Розмістіть цей файл в /etc/systemd/system/flask-app.service
+
+[Unit]
+Description=Flask Database API Application
+After=network.target
+Documentation=https://github.com/ваш_username/ваш_репозиторій
+
+[Service]
+# Користувач та група
+User=azureuser
+Group=www-data
+
+# Робоча директорія
+WorkingDirectory=/home/azureuser/назва_вашого_проекту
+
+# Змінні середовища
+Environment="PATH=/home/azureuser/назва_вашого_проекту/venv/bin"
+EnvironmentFile=/home/azureuser/назва_вашого_проекту/.env
+
+# Команда запуску
+ExecStart=/home/azureuser/назва_вашого_проекту/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    --timeout 600 \
+    --access-logfile /var/log/flask-app/access.log \
+    --error-logfile /var/log/flask-app/error.log \
+    --log-level info \
+    app:app
+
+# Перезапуск при збоях
+Restart=always
+RestartSec=10
+
+# Обмеження ресурсів
+LimitNOFILE=4096
+
+# Безпека
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
