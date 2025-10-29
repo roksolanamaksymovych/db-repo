@@ -82,6 +82,29 @@ docker ps
 open https://portal.azure.com
 ```
 
+### Крок 4.5: Додайте тестові дані (якщо база порожня)
+
+Якщо Swagger показує порожні списки:
+
+```bash
+# Отримайте URL вашого додатку
+APP_URL=$(cat .env.azure | grep APP_URL | cut -d'=' -f2)
+
+# Або вручну встановіть
+APP_URL="https://your-app-url.azurecontainerapps.io"
+
+# Додайте тестові дані
+python3 add_test_data.py $APP_URL
+```
+
+Це додасть:
+
+- 3 тестових користувачів
+- 3 категорії
+- 4 властивості
+
+Після цього перевірте Swagger - дані мають з'явитися!
+
 ### Крок 5: Запустіть тест навантаження
 
 ```bash
