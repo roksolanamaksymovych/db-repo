@@ -28,8 +28,8 @@ if ! command -v az &> /dev/null; then
 fi
 
 # Конфігураційні змінні (ЗМІНІТЬ НА СВОЇ)
-RESOURCE_GROUP="db-repo-rg"
-LOCATION="westeurope"
+RESOURCE_GROUP="labs"
+LOCATION="westus"
 ACR_NAME="dbreporegistry"
 CONTAINER_APP_NAME="db-repo-app"
 CONTAINER_APP_ENV="db-repo-env"
@@ -37,9 +37,9 @@ IMAGE_NAME="flask-rest-api"
 IMAGE_TAG="latest"
 
 # База даних (використовуйте існуючу Azure MySQL або змініть)
-DB_HOST="${DB_HOST:-your-mysql-server.mysql.database.azure.com}"
-DB_USER="${DB_USER:-adminuser}"
-DB_PASSWORD="${DB_PASSWORD:-YourPassword123!}"
+DB_HOST="${DB_HOST:-labissserver.mysql.database.azure.com}"
+DB_USER="${DB_USER:-roksolana}"
+DB_PASSWORD="${DB_PASSWORD:-Maks_mia3!}"
 DB_NAME="${DB_NAME:-database_lab1_eer}"
 
 log "Початок розгортання на Azure..."
@@ -48,42 +48,110 @@ log "Початок розгортання на Azure..."
 log "Перевірка автентифікації Azure..."
 az account show &> /dev/null || az login
 
-# 2. Створення Resource Group
+# 2. Реєстрація необхідних resource providers
+log "Реєстрація resource providers..."
+az provider register --namespace Microsoft.App --wait
+az provider register --namespace Microsoft.OperationalInsights --wait
+az provider register --namespace Microsoft.ContainerRegistry --wait
+log "Resource providers зареєстровано"
+
+# 3. Створення Resource Group (якщо не існує)
 log "Створення Resource Group: $RESOURCE_GROUP"
-az group create --name $RESOURCE_GROUP --location $LOCATION
+az group create --name $RESOURCE_GROUP --location $LOCATION --output none
 
-# 3. Створення Azure Container Registry
-log "Створення Azure Container Registry: $ACR_NAME"
-az acr create \
-    --resource-group $RESOURCE_GROUP \
-    --name $ACR_NAME \
-    --sku Basic \
-    --admin-enabled true
+# 4. Перевірка та створення Azure Container Registry
+log "Перевірка існування ACR: $ACR_NAME"
+ACR_EXISTS=$(az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP 2>/dev/null)
 
-# 4. Вхід в ACR
+if [ -z "$ACR_EXISTS" ]; then
+    log "Створення нового Azure Container Registry: $ACR_NAME"
+    az acr create \
+        --resource-group $RESOURCE_GROUP \
+        --name $ACR_NAME \
+        --sku Basic \
+        --admin-enabled true \
+        --output none
+    
+    if [ $? -ne 0 ]; then
+        error "Не вдалося створити ACR. Перевірте чи назва '$ACR_NAME' доступна (має бути унікальною глобально)"
+    fi
+    log "ACR створено успішно"
+else
+    log "ACR вже існує, використовуємо існуючий"
+    # Переконуємося що admin enabled
+    az acr update --name $ACR_NAME --admin-enabled true --output none
+fi
+
+# 5. Вхід в ACR
 log "Вхід в Azure Container Registry..."
 az acr login --name $ACR_NAME
 
-# 5. Побудова Docker образу
+if [ $? -ne 0 ]; then
+    error "Не вдалося увійти в ACR"
+fi
+
+# 6. Побудова Docker образу
 log "Побудова Docker образу..."
 docker build -t ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG} .
 
-# 6. Публікація образу в ACR
+if [ $? -ne 0 ]; then
+    error "Не вдалося побудувати Docker образ"
+fi
+log "Docker образ побудовано успішно"
+
+# 7. Публікація образу в ACR
 log "Публікація образу в Azure Container Registry..."
 docker push ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}
 
-# 7. Отримання облікових даних ACR
-ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query username -o tsv)
-ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query passwords[0].value -o tsv)
+if [ $? -ne 0 ]; then
+    error "Не вдалося запушити образ в ACR"
+fi
+log "Образ успішно завантажено в ACR"
 
-# 8. Створення Container Apps Environment
+# 8. Отримання облікових даних ACR
+log "Отримання облікових даних ACR..."
+ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query username -o tsv 2>/dev/null)
+ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query passwords[0].value -o tsv 2>/dev/null)
+
+if [ -z "$ACR_USERNAME" ] || [ -z "$ACR_PASSWORD" ]; then
+    error "Не вдалося отримати облікові дані ACR. Переконайтеся що admin-enabled=true"
+fi
+log "Облікові дані отримано: $ACR_USERNAME"
+
+# 9. Створення Container Apps Environment
 log "Створення Container Apps Environment..."
-az containerapp env create \
-    --name $CONTAINER_APP_ENV \
-    --resource-group $RESOURCE_GROUP \
-    --location $LOCATION
+ENV_EXISTS=$(az containerapp env show --name $CONTAINER_APP_ENV --resource-group $RESOURCE_GROUP 2>/dev/null)
 
-# 9. Розгортання Container App з автомасштабуванням
+if [ -z "$ENV_EXISTS" ]; then
+    log "Створення нового Environment..."
+    az containerapp env create \
+        --name $CONTAINER_APP_ENV \
+        --resource-group $RESOURCE_GROUP \
+        --location $LOCATION \
+        --output none
+    
+    if [ $? -ne 0 ]; then
+        error "Не вдалося створити Container Apps Environment"
+    fi
+    log "Environment створено успішно"
+else
+    log "Environment вже існує, використовуємо існуючий"
+fi
+
+# 10. Видалення існуючого Container App (якщо є) та створення нового
+log "Перевірка існування Container App..."
+APP_EXISTS=$(az containerapp show --name $CONTAINER_APP_NAME --resource-group $RESOURCE_GROUP 2>/dev/null)
+
+if [ -n "$APP_EXISTS" ]; then
+    warning "Container App вже існує, видаляємо старий..."
+    az containerapp delete \
+        --name $CONTAINER_APP_NAME \
+        --resource-group $RESOURCE_GROUP \
+        --yes \
+        --output none
+    log "Старий Container App видалено"
+fi
+
 log "Створення Container App з автомасштабуванням..."
 az containerapp create \
     --name $CONTAINER_APP_NAME \
@@ -91,8 +159,8 @@ az containerapp create \
     --environment $CONTAINER_APP_ENV \
     --image ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG} \
     --registry-server ${ACR_NAME}.azurecr.io \
-    --registry-username $ACR_USERNAME \
-    --registry-password $ACR_PASSWORD \
+    --registry-username "$ACR_USERNAME" \
+    --registry-password "$ACR_PASSWORD" \
     --target-port 5000 \
     --ingress external \
     --min-replicas 1 \
@@ -100,33 +168,52 @@ az containerapp create \
     --cpu 0.5 \
     --memory 1.0Gi \
     --env-vars \
-        DB_HOST=$DB_HOST \
-        DB_USER=$DB_USER \
-        DB_PASSWORD=$DB_PASSWORD \
-        DB_NAME=$DB_NAME \
-        PORT=5000
+        DB_HOST="$DB_HOST" \
+        DB_USER="$DB_USER" \
+        DB_PASSWORD="$DB_PASSWORD" \
+        DB_NAME="$DB_NAME" \
+        PORT=5000 \
+    --output none
 
-# 10. Налаштування правил автомасштабування
+if [ $? -ne 0 ]; then
+    error "Не вдалося створити Container App"
+fi
+log "Container App створено успішно"
+
+# 11. Налаштування правил автомасштабування
 log "Налаштування правил автомасштабування..."
+
+log "Додавання правила масштабування за CPU..."
 az containerapp update \
     --name $CONTAINER_APP_NAME \
     --resource-group $RESOURCE_GROUP \
     --scale-rule-name cpu-scaling \
     --scale-rule-type cpu \
-    --scale-rule-metadata type=Utilization value=70
+    --scale-rule-metadata type=Utilization value=70 \
+    --output none
 
+log "Додавання правила масштабування за Memory..."
 az containerapp update \
     --name $CONTAINER_APP_NAME \
     --resource-group $RESOURCE_GROUP \
     --scale-rule-name memory-scaling \
     --scale-rule-type memory \
-    --scale-rule-metadata type=Utilization value=80
+    --scale-rule-metadata type=Utilization value=80 \
+    --output none
 
-# 11. Отримання URL додатку
+log "Правила автомасштабування налаштовано"
+
+# 12. Отримання URL додатку
+log "Отримання URL додатку..."
 APP_URL=$(az containerapp show \
     --name $CONTAINER_APP_NAME \
     --resource-group $RESOURCE_GROUP \
     --query properties.configuration.ingress.fqdn -o tsv)
+
+if [ -z "$APP_URL" ]; then
+    warning "Не вдалося отримати URL додатку"
+    APP_URL="невідомо"
+fi
 
 log "=========================================="
 log "Розгортання завершено успішно!"
