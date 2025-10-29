@@ -39,7 +39,7 @@ IMAGE_TAG="latest"
 # База даних (використовуйте існуючу Azure MySQL або змініть)
 DB_HOST="${DB_HOST:-labissserver.mysql.database.azure.com}"
 DB_USER="${DB_USER:-roksolana}"
-DB_PASSWORD="${DB_PASSWORD:-Maks_mia3!}"
+DB_PASSWORD="${DB_PASSWORD:-Maks_mia3}"
 DB_NAME="${DB_NAME:-database_lab1_eer}"
 
 log "Початок розгортання на Azure..."
