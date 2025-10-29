@@ -12,10 +12,11 @@ load_dotenv()
 
 app = create_app()
 
-app.register_blueprint(user_bp)
-app.register_blueprint(category_bp)
-app.register_blueprint(property_bp)
-app.register_blueprint(property_category_bp)
+# Реєстрація blueprints з префіксом /api
+app.register_blueprint(user_bp, url_prefix='/api')
+app.register_blueprint(category_bp, url_prefix='/api')
+app.register_blueprint(property_bp, url_prefix='/api')
+app.register_blueprint(property_category_bp, url_prefix='/api')
 
 
 if __name__ == '__main__':
