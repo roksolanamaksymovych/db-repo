@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # MySQL база даних
+  mysql:
+    image: mysql:8.0
+    container_name: db-repo-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-Maks_mia3}
+      MYSQL_DATABASE: ${DB_NAME:-database_lab1_eer}
+      MYSQL_USER: ${DB_USER:-appuser}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-Maks_mia3}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-Maks_mia3}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Flask REST API
+  flask-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: db-repo-flask
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-Maks_mia3}
+      - DB_NAME=${DB_NAME:-database_lab1_eer}
+      - PORT=5000
+      - FLASK_ENV=production
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/docs/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
+
