@@ -3,15 +3,19 @@
 ## Проблема: ACR з такою назвою не доступний
 
 ### Симптоми
+
 ```
 ERROR: The resource with name 'dbreporegistry' could not be found
 ```
+
 або
+
 ```
 failed to do request: dial tcp: lookup dbreporegistry.azurecr.io: no such host
 ```
 
 ### Причина
+
 Ім'я Azure Container Registry має бути **унікальним глобально**. Якщо хтось вже використовує це ім'я, ви не можете його використати.
 
 ### Рішення
@@ -37,12 +41,14 @@ ACR_NAME="вашеунікальнеімя123"  # Замініть на дост
 ```
 
 **Вимоги до імені:**
+
 - Тільки малі латинські літери та цифри
 - Довжина: 5-50 символів
 - Без дефісів, підкреслень, інших символів
 - Має бути унікальним глобально
 
 **Приклади хороших імен:**
+
 - `dbreporoksolana2025`
 - `flaskapplab123456`
 - `myuniquerepo789`
@@ -52,11 +58,13 @@ ACR_NAME="вашеунікальнеімя123"  # Замініть на дост
 ## Проблема: Subscription not registered
 
 ### Симптоми
+
 ```
 Subscription is not registered for the Microsoft.OperationalInsights resource provider
 ```
 
 ### Рішення
+
 Виправлений скрипт `azure-deploy.sh` вже автоматично реєструє необхідні провайдери. Якщо проблема залишається:
 
 ```bash
@@ -72,14 +80,17 @@ az provider register --namespace Microsoft.ContainerRegistry --wait
 ## Проблема: Пусті credentials для registry
 
 ### Симптоми
+
 ```
 argument --registry-username: expected one argument
 ```
 
 ### Причина
+
 ACR не має увімкненого admin доступу або credentials не отримані.
 
 ### Рішення
+
 Виправлений скрипт перевіряє це автоматично. Якщо проблема залишається:
 
 ```bash
@@ -95,6 +106,7 @@ az acr credential show --name вашеacr
 ## Проблема: Docker образ не будується
 
 ### Симптоми
+
 ```
 ERROR: failed to solve: ...
 ```
@@ -102,30 +114,83 @@ ERROR: failed to solve: ...
 ### Рішення
 
 1. Переконайтеся що Docker Desktop запущено:
+
 ```bash
 docker ps
 ```
 
 2. Очистіть Docker кеш:
+
 ```bash
 docker system prune -a
 ```
 
 3. Спробуйте побудувати вручну:
+
 ```bash
 docker build -t test-image .
 ```
 
 ---
 
+## Проблема: Platform mismatch (linux/amd64)
+
+### Симптоми
+
+```
+Field 'template.containers.db-repo-app.image' is invalid with details:
+'Invalid value: "dbreporegistry.azurecr.io/flask-rest-api:latest":
+no child with platform linux/amd64 in index'
+```
+
+### Причина
+
+На Mac з Apple Silicon (M1/M2/M3) Docker за замовчуванням будує образи для ARM64, але Azure Container Apps потребує linux/amd64.
+
+### Рішення
+
+**Оновлений скрипт вже виправлено!** Він автоматично будує для правильної платформи.
+
+Якщо потрібно вручну:
+
+```bash
+# Побудова для linux/amd64
+docker buildx build --platform linux/amd64 \
+  -t dbreporegistry.azurecr.io/flask-rest-api:latest .
+
+# Або якщо buildx не працює
+docker build --platform linux/amd64 \
+  -t dbreporegistry.azurecr.io/flask-rest-api:latest .
+
+# Перевірка платформи образу
+docker inspect dbreporegistry.azurecr.io/flask-rest-api:latest | grep Architecture
+```
+
+**Після виправлення:**
+
+1. Видаліть старий образ з ACR:
+
+```bash
+az acr repository delete \
+  --name dbreporegistry \
+  --repository flask-rest-api \
+  --yes
+```
+
+2. Запустіть azure-deploy.sh знову - він побудує правильний образ
+
+---
+
 ## Проблема: Container App не створюється
 
 ### Симптоми
+
 ```
 The containerapp 'db-repo-app' does not exist
 ```
 
 ### Причини
+
 1. Помилка на попередніх кроках
 2. Недостатньо квоти в підписці
 3. Проблеми з мережею
@@ -148,6 +213,7 @@ az containerapp create \
 ```
 
 3. Перевірте квоти:
+
 ```bash
 az vm list-usage --location westus -o table
 ```
@@ -157,12 +223,14 @@ az vm list-usage --location westus -o table
 ## Проблема: База даних не доступна
 
 ### Симптоми
+
 - Container App запущений але не працює
 - Помилки в логах про підключення до БД
 
 ### Рішення
 
 1. Перевірте чи правильні credentials у `azure-deploy.sh`:
+
 ```bash
 DB_HOST="labissserver.mysql.database.azure.com"
 DB_USER="roksolana"
@@ -171,10 +239,12 @@ DB_NAME="database_lab1_eer"
 ```
 
 2. Перевірте чи Azure MySQL дозволяє підключення з Azure services:
+
    - Azure Portal → MySQL → Networking
    - Увімкніть "Allow public access from any Azure service"
 
 3. Перевірте логи Container App:
+
 ```bash
 az containerapp logs show \
     --name db-repo-app \
@@ -246,6 +316,7 @@ az containerapp revision list \
 ## Повний workflow після виправлення
 
 1. **Перевірте ім'я ACR:**
+
 ```bash
 ./check-acr-name.sh вашеімя123
 ```
@@ -253,22 +324,26 @@ az containerapp revision list \
 2. **Змініть azure-deploy.sh** з новим іменем ACR
 
 3. **Очистіть попередні ресурси** (якщо є помилки):
+
 ```bash
 az group delete --name labs --yes --no-wait
 # Зачекайте 2-3 хвилини
 ```
 
 4. **Запустіть розгортання:**
+
 ```bash
 ./azure-deploy.sh
 ```
 
 5. **Моніторте статус:**
+
 ```bash
 ./azure-status.sh
 ```
 
 6. **Тестуйте:**
+
 ```bash
 python3 load_test.py --url https://your-app-url --threads 20 --duration 300
 ```
@@ -286,4 +361,3 @@ python3 load_test.py --url https://your-app-url --threads 20 --duration 300
 ---
 
 **Успіхів! 🚀**
-

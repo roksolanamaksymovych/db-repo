@@ -90,14 +90,19 @@ if [ $? -ne 0 ]; then
     error "Не вдалося увійти в ACR"
 fi
 
-# 6. Побудова Docker образу
-log "Побудова Docker образу..."
-docker build -t ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG} .
+# 6. Побудова Docker образу для linux/amd64 платформи
+log "Побудова Docker образу для linux/amd64..."
+docker buildx build --platform linux/amd64 -t ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG} .
 
 if [ $? -ne 0 ]; then
-    error "Не вдалося побудувати Docker образ"
+    warning "Buildx не вдався, пробуємо звичайний build з --platform..."
+    docker build --platform linux/amd64 -t ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG} .
+    
+    if [ $? -ne 0 ]; then
+        error "Не вдалося побудувати Docker образ"
+    fi
 fi
-log "Docker образ побудовано успішно"
+log "Docker образ побудовано успішно для linux/amd64"
 
 # 7. Публікація образу в ACR
 log "Публікація образу в Azure Container Registry..."
