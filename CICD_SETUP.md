@@ -139,7 +139,7 @@ az webapp deployment list-publishing-profiles \
 
 ```yaml
 env:
-  AZURE_WEBAPP_NAME: db-repo-flask-app    # Змініть на ім'я вашого Web App
+  AZURE_WEBAPP_NAME: db-repo-flask-app # Змініть на ім'я вашого Web App
 ```
 
 ---
@@ -206,6 +206,7 @@ az webapp log download \
 ### Проблема: Application Error
 
 **Рішення:**
+
 1. Перевірте логи:
    ```bash
    az webapp log tail --name db-repo-flask-app --resource-group db-repo-rg
@@ -216,6 +217,7 @@ az webapp log download \
 ### Проблема: Database connection failed
 
 **Рішення:**
+
 1. Перевірте змінні середовища в Configuration
 2. Переконайтеся що Azure MySQL дозволяє підключення з Azure services
 3. Перевірте firewall rules в MySQL
@@ -223,6 +225,7 @@ az webapp log download \
 ### Проблема: Workflow fails
 
 **Рішення:**
+
 1. Перевірте що `AZUREAPPSERVICE_PUBLISHPROFILE` доданий в GitHub Secrets
 2. Перевірте що `AZURE_WEBAPP_NAME` правильний в workflow
 3. Подивіться детальні логи в GitHub Actions
@@ -316,4 +319,3 @@ az webapp ssh --name db-repo-flask-app --resource-group db-repo-rg
 ---
 
 **Успіхів з CI/CD! 🚀**
-
