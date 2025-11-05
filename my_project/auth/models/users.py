@@ -12,7 +12,6 @@ class User(db.Model):
     created_at = db.Column(db.TIMESTAMP, nullable=False, server_default=db.func.current_timestamp())
     updated_at = db.Column(db.TIMESTAMP, nullable=False, server_default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
-    # Відношення до Properties (якщо user є власником властивості)
     properties = db.relationship('Property', back_populates='owner', cascade="all, delete-orphan")
 
     def to_dict(self):

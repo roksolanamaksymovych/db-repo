@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-"""
-Скрипт для додавання тестових даних через API
-"""
 
 import requests
 import json

@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # MySQL база даних
   mysql:
     image: mysql:8.0
     container_name: db-repo-mysql
@@ -23,7 +22,6 @@ services:
     networks:
       - app-network
 
-  # Flask REST API
   flask-app:
     build:
       context: .

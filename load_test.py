@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-"""
-Скрипт для генерування навантаження на REST API
-Симулює запити до всіх ендпоінтів для тестування автомасштабування
-"""
+
 
 import requests
 import time
@@ -14,14 +10,7 @@ import argparse
 
 class LoadGenerator:
     def __init__(self, base_url, num_threads=10, duration=300):
-        """
-        Ініціалізація генератора навантаження
         
-        Args:
-            base_url: Базовий URL API (наприклад, http://localhost:5000)
-            num_threads: Кількість паралельних потоків
-            duration: Тривалість тесту в секундах
-        """
         self.base_url = base_url.rstrip('/')
         self.num_threads = num_threads
         self.duration = duration
@@ -35,12 +24,11 @@ class LoadGenerator:
         self.lock = threading.Lock()
         
     def log(self, message, level='INFO'):
-        """Вивід логів з часовою міткою"""
+        
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         print(f"[{timestamp}] [{level}] {message}")
     
     def make_request(self, method, endpoint, data=None):
-        """Виконання HTTP запиту з вимірюванням часу відповіді"""
         url = f"{self.base_url}{endpoint}"
         start_time = time.time()
         
@@ -77,7 +65,6 @@ class LoadGenerator:
             return None, elapsed_time
     
     def generate_random_user(self):
-        """Генерація випадкових даних користувача"""
         random_id = random.randint(1000, 9999)
         return {
             "Name": f"TestUser{random_id}",
@@ -86,7 +73,6 @@ class LoadGenerator:
         }
     
     def generate_random_category(self):
-        """Генерація випадкових даних категорії"""
         categories = ["Electronics", "Furniture", "Clothing", "Books", "Sports"]
         return {
             "CategoryName": f"{random.choice(categories)}{random.randint(100, 999)}",
@@ -94,7 +80,6 @@ class LoadGenerator:
         }
     
     def generate_random_property(self):
-        """Генерація випадкових даних властивості"""
         return {
             "PropertyName": f"Property{random.randint(100, 999)}",
             "Price": round(random.uniform(10.0, 1000.0), 2),
@@ -103,7 +88,6 @@ class LoadGenerator:
         }
     
     def worker_thread(self, thread_id):
-        """Робочий потік для генерування запитів"""
         self.log(f"Потік {thread_id} запущено", "DEBUG")
         
         endpoints = [
@@ -111,10 +95,9 @@ class LoadGenerator:
             ('GET', '/api/categories', None),
             ('GET', '/api/properties', None),
             ('GET', '/api/property_categories', None),
-            ('GET', '/api/docs/', None),  # Swagger documentation
+            ('GET', '/api/docs/', None),  
         ]
         
-        # Додаємо POST запити для створення даних (з меншою ймовірністю)
         post_endpoints = [
             ('POST', '/api/users', lambda: self.generate_random_user()),
             ('POST', '/api/categories', lambda: self.generate_random_category()),
@@ -124,7 +107,7 @@ class LoadGenerator:
         request_count = 0
         
         while not self.stop_flag:
-            # 80% GET запитів, 20% POST запитів
+         
             if random.random() < 0.8:
                 method, endpoint, data = random.choice(endpoints)
             else:
@@ -134,12 +117,10 @@ class LoadGenerator:
             status_code, response_time = self.make_request(method, endpoint, data)
             request_count += 1
             
-            # Логування кожні 10 запитів
             if request_count % 10 == 0:
                 status_str = f"Status: {status_code}" if status_code else "FAILED"
                 self.log(f"Потік {thread_id}: {request_count} запитів, {status_str}, час: {response_time:.3f}s", "DEBUG")
             
-            # Невелика пауза між запитами (0.1-0.5 секунд)
             time.sleep(random.uniform(0.1, 0.5))
         
         self.log(f"Потік {thread_id} завершено. Всього запитів: {request_count}", "INFO")
@@ -179,7 +160,7 @@ class LoadGenerator:
         self.log(f"Початок тесту навантаження на {self.base_url}", "INFO")
         self.log(f"Параметри: {self.num_threads} потоків, тривалість: {self.duration} сек", "INFO")
         
-        # Перевірка доступності API
+        
         try:
             response = requests.get(f"{self.base_url}/api/docs/", timeout=10)
             if response.status_code == 200:
@@ -190,7 +171,7 @@ class LoadGenerator:
             self.log(f"Не вдалося підключитися до API: {e}", "ERROR")
             self.log("Продовжуємо тест...", "WARNING")
         
-        # Запуск робочих потоків
+
         threads = []
         for i in range(self.num_threads):
             thread = threading.Thread(target=self.worker_thread, args=(i,))
@@ -198,11 +179,11 @@ class LoadGenerator:
             thread.start()
             threads.append(thread)
         
-        # Періодичний вивід статистики
+     
         start_time = time.time()
         try:
             while time.time() - start_time < self.duration:
-                time.sleep(10)  # Вивід статистики кожні 10 секунд
+                time.sleep(10)  
                 elapsed = int(time.time() - start_time)
                 remaining = self.duration - elapsed
                 with self.lock:
@@ -212,20 +193,17 @@ class LoadGenerator:
         except KeyboardInterrupt:
             self.log("Отримано сигнал переривання, завершуємо тест...", "WARNING")
         
-        # Зупинка потоків
         self.stop_flag = True
         self.log("Очікування завершення потоків...", "INFO")
         for thread in threads:
             thread.join(timeout=5)
         
-        # Вивід фінальної статистики
         self.print_stats()
         
-        # Збереження результатів у файл
         self.save_results()
     
     def save_results(self):
-        """Збереження результатів у файл"""
+     
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"load_test_results_{timestamp}.txt"
         
